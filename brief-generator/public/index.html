@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neemans — Brief Generator</title>
+  <style>
+    :root {
+      --coal:   #3A3A3A;
+      --ecru:   #F3F2EE;
+      --wool:   #EDD8C3;
+      --accent: #8B7355;
+      --green:  #2E7D32;
+      --red:    #C62828;
+      --grey:   #999;
+      --border: #DDD9D0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--ecru);
+      color: var(--coal);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--coal);
+      color: var(--ecru);
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 22px; letter-spacing: 4px; font-weight: 700; }
+    header span {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      border-left: 1px solid #555;
+      padding-left: 16px;
+      text-transform: uppercase;
+    }
+    .bible-badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+    .bible-badge.loaded   { background: #E8F5E9; color: var(--green); }
+    .bible-badge.missing  { background: #FFF3E0; color: #E65100; }
+
+    /* ── Layout ── */
+    .wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .wrapper { grid-template-columns: 1fr; }
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .panel h2 {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--ecru);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-zone p { font-size: 13px; color: var(--grey); line-height: 1.5; }
+    .upload-zone strong { color: var(--coal); }
+
+    /* ── Image previews ── */
+    .previews {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .preview-item {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      background: var(--ecru);
+    }
+    .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .preview-item .remove {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(0,0,0,.55); color: #fff;
+      border: none; border-radius: 50%; width: 20px; height: 20px;
+      font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Selects ── */
+    .field { margin-top: 20px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--coal); margin-bottom: 8px;
+    }
+    .field select {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--ecru); color: var(--coal);
+      font-size: 14px; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%238B7355' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .field select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Generate button ── */
+    .btn-generate {
+      margin-top: 24px; width: 100%;
+      padding: 14px; background: var(--coal); color: var(--ecru);
+      border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer;
+      transition: background .2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-generate:hover:not(:disabled) { background: #222; }
+    .btn-generate:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Status ── */
+    .status {
+      margin-top: 16px; padding: 12px 16px;
+      border-radius: 8px; font-size: 13px;
+      display: none;
+    }
+    .status.loading { background: #FFF8E1; color: #795548; border: 1px solid #FFCC80; }
+    .status.error   { background: #FFEBEE; color: var(--red); border: 1px solid #FFCDD2; }
+    .status.success { background: #E8F5E9; color: var(--green); border: 1px solid #A5D6A7; }
+
+    /* ── Results pane ── */
+    .results-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 400px; text-align: center;
+      color: var(--grey);
+    }
+    .results-empty .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+    .results-empty p { font-size: 14px; line-height: 1.6; }
+
+    .results-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 20px;
+    }
+    .results-header h2 {
+      font-size: 13px; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .download-group { display: flex; gap: 8px; }
+    .btn-download {
+      padding: 8px 18px;
+      background: var(--coal); color: var(--ecru);
+      border: none; border-radius: 6px;
+      font-size: 12px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase; cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-download:hover:not(:disabled) { background: #222; }
+    .btn-download:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-pdf { background: var(--accent); }
+    .btn-pdf:hover:not(:disabled) { background: #7a6349; }
+
+    /* ── Shoe chip ── */
+    .shoe-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--wool); border-radius: 6px;
+      padding: 8px 14px; margin-bottom: 20px;
+      font-size: 13px; color: var(--coal);
+    }
+    .shoe-chip strong { font-weight: 700; }
+
+    /* ── Brief cards ── */
+    .briefs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 700px) {
+      .briefs-grid { grid-template-columns: 1fr; }
+    }
+
+    .brief-card {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    .brief-card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .brief-type-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; padding: 3px 8px;
+      border-radius: 4px; white-space: nowrap;
+    }
+    .badge-indoor    { background: #E3F2FD; color: #1565C0; }
+    .badge-leg       { background: #F3E5F5; color: #6A1B9A; }
+    .badge-outdoor   { background: #E8F5E9; color: var(--green); }
+    .badge-mood      { background: #FFF8E1; color: #E65100; }
+
+    .brief-headline { font-size: 14px; font-weight: 700; color: var(--coal); }
+
+    .brief-body { padding: 18px; }
+
+    .brief-scene {
+      font-size: 13px; color: var(--grey);
+      font-style: italic; margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .spec-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 14px;
+    }
+    .spec-item { }
+    .spec-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .spec-value { font-size: 12px; color: var(--coal); line-height: 1.4; }
+
+    .ai-prompt-box {
+      background: var(--ecru); border-radius: 8px;
+      padding: 12px 14px; margin-top: 14px;
+      border: 1px solid var(--border);
+    }
+    .ai-prompt-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--accent);
+      margin-bottom: 8px; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    .copy-btn {
+      background: none; border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 8px;
+      font-size: 10px; cursor: pointer; color: var(--coal);
+      transition: background .15s;
+    }
+    .copy-btn:hover { background: var(--wool); }
+    .ai-prompt-text {
+      font-size: 11.5px; line-height: 1.6;
+      color: var(--coal); font-style: italic;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>NEEMANS</h1>
+  <span>Brief Generator</span>
+  <div class="bible-badge missing" id="bibleBadge">Style Bible: checking…</div>
+</header>
+
+<div class="wrapper">
+
+  <!-- ── Left panel: controls ── -->
+  <div class="panel">
+    <h2>Upload Shoe Images</h2>
+
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" multiple accept="image/*" />
+      <div class="upload-icon">👟</div>
+      <p><strong>Click to upload</strong> or drag & drop<br/>Up to 6 images · JPG, PNG, WEBP</p>
+    </div>
+
+    <div class="previews" id="previews"></div>
+
+    <div class="field">
+      <label>Category</label>
+      <select id="category">
+        <option value="">— Select category —</option>
+        <option value="Casual">Casual</option>
+        <option value="Athleisure">Athleisure</option>
+        <option value="Formal">Formal</option>
+        <option value="Open Footwear">Open Footwear</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Gender</label>
+      <select id="gender">
+        <option value="">— Select gender —</option>
+        <option value="Men's">Men's</option>
+        <option value="Women's">Women's</option>
+        <option value="Unisex">Unisex</option>
+      </select>
+    </div>
+
+    <button class="btn-generate" id="generateBtn" disabled>
+      Generate Briefs
+    </button>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- ── Right panel: results ── -->
+  <div id="resultsPane">
+    <div class="results-empty" id="emptyState">
+      <div class="empty-icon">✦</div>
+      <p>Upload shoe images, select a category,<br/>and click Generate Briefs.</p>
+    </div>
+
+    <div id="resultsContent" style="display:none">
+      <div class="results-header">
+        <h2>Generated Briefs</h2>
+        <div class="download-group">
+          <button class="btn-download" id="downloadBtn">↓ Markdown</button>
+          <button class="btn-download btn-pdf" id="downloadPdfBtn">↓ PDF</button>
+        </div>
+      </div>
+      <div id="shoeChip"></div>
+      <div class="briefs-grid" id="briefsGrid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let selectedFiles = [];
+  let generatedMarkdown = '';
+  let lastBriefData = null;
+
+  const BADGE_COLORS = {
+    'Indoor Lifestyle': 'badge-indoor',
+    'Leg / Close-up':   'badge-leg',
+    'Outdoor / Editorial': 'badge-outdoor',
+    'Mood / Concept':   'badge-mood',
+  };
+
+  // ── Bible status ───────────────────────────────────────────────────────────
+  fetch('/status').then(r => r.json()).then(d => {
+    const el = document.getElementById('bibleBadge');
+    if (d.bibleLoaded) {
+      el.textContent = '✓ Style Bible Loaded';
+      el.className = 'bible-badge loaded';
+    } else {
+      el.textContent = '⚠ No Style Bible';
+      el.className = 'bible-badge missing';
+    }
+  });
+
+  // ── File handling ──────────────────────────────────────────────────────────
+  const fileInput   = document.getElementById('fileInput');
+  const uploadZone  = document.getElementById('uploadZone');
+  const previewsEl  = document.getElementById('previews');
+
+  fileInput.addEventListener('change', e => addFiles([...e.target.files]));
+
+  uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+  });
+
+  function addFiles(newFiles) {
+    const remaining = 6 - selectedFiles.length;
+    selectedFiles = [...selectedFiles, ...newFiles.slice(0, remaining)];
+    renderPreviews();
+    updateButton();
+  }
+
+  function removeFile(idx) {
+    selectedFiles.splice(idx, 1);
+    renderPreviews();
+    updateButton();
+  }
+
+  function renderPreviews() {
+    previewsEl.innerHTML = '';
+    selectedFiles.forEach((file, i) => {
+      const url  = URL.createObjectURL(file);
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.innerHTML = `<img src="${url}" alt="shoe ${i+1}" />
+        <button class="remove" onclick="removeFile(${i})">×</button>`;
+      previewsEl.appendChild(item);
+    });
+    // Show/hide upload zone hint
+    uploadZone.querySelector('p').style.display = selectedFiles.length >= 6 ? 'none' : '';
+  }
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+  const catSel  = document.getElementById('category');
+  const genSel  = document.getElementById('gender');
+  const genBtn  = document.getElementById('generateBtn');
+
+  [catSel, genSel].forEach(el => el.addEventListener('change', updateButton));
+
+  function updateButton() {
+    genBtn.disabled = !(selectedFiles.length > 0 && catSel.value && genSel.value);
+  }
+
+  // ── Generate ───────────────────────────────────────────────────────────────
+  genBtn.addEventListener('click', generate);
+
+  async function generate() {
+    setStatus('loading', '⏳ Analysing shoe with Claude Vision…');
+    genBtn.disabled = true;
+    genBtn.innerHTML = '<div class="spinner"></div> Generating…';
+
+    const form = new FormData();
+    selectedFiles.forEach(f => form.append('images', f));
+    form.append('category', catSel.value);
+    form.append('gender',   genSel.value);
+
+    try {
+      const resp = await fetch('/generate', { method: 'POST', body: form });
+      const data = await resp.json();
+
+      if (!resp.ok) throw new Error(data.error || 'Generation failed.');
+
+      setStatus('success', `✓ ${data.briefs.length} briefs generated successfully.`);
+      generatedMarkdown = data.markdown;
+      lastBriefData = {
+        briefs:       data.briefs,
+        shoeAnalysis: data.shoeAnalysis,
+        category:     catSel.value,
+        gender:       genSel.value,
+      };
+      renderResults(data.briefs, data.shoeAnalysis);
+
+    } catch (err) {
+      setStatus('error', '✗ ' + err.message);
+    } finally {
+      genBtn.disabled = false;
+      genBtn.innerHTML = 'Generate Briefs';
+      updateButton();
+    }
+  }
+
+  // ── Render results ─────────────────────────────────────────────────────────
+  function renderResults(briefs, shoe) {
+    document.getElementById('emptyState').style.display   = 'none';
+    document.getElementById('resultsContent').style.display = '';
+
+    // Shoe chip
+    const chipEl = document.getElementById('shoeChip');
+    let chipText = `<strong>${shoe.shoe_style_type || 'Shoe'}</strong>`;
+    if (shoe.shoe_color_primary) chipText += ` · ${shoe.shoe_color_primary}`;
+    if (shoe.sole_color)         chipText += ` / ${shoe.sole_color} sole`;
+    chipEl.innerHTML = `<div class="shoe-chip">👟 ${chipText}</div>`;
+
+    // Brief cards
+    const grid = document.getElementById('briefsGrid');
+    grid.innerHTML = '';
+    briefs.forEach(b => grid.appendChild(buildCard(b)));
+  }
+
+  function buildCard(b) {
+    const card  = document.createElement('div');
+    card.className = 'brief-card';
+
+    const badgeClass = BADGE_COLORS[b.type] || 'badge-indoor';
+    const promptId   = 'prompt_' + Math.random().toString(36).slice(2);
+
+    card.innerHTML = `
+      <div class="brief-card-header">
+        <span class="brief-type-badge ${badgeClass}">${b.type}</span>
+        <span class="brief-headline">${b.headline}</span>
+      </div>
+      <div class="brief-body">
+        <div class="brief-scene">${b.scene}</div>
+        <hr/>
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-label">Clothing</div>
+            <div class="spec-value">${b.clothing?.type || '—'}<br/><em style="color:var(--grey)">${b.clothing?.color || ''} · ${b.clothing?.fit || ''}</em></div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Camera</div>
+            <div class="spec-value">${b.camera?.angle || '—'}<br/><em style="color:var(--grey)">Shoe: ${b.camera?.shoe_in_frame || '—'}</em></div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Model</div>
+            <div class="spec-value">${b.model?.skin_tone || '—'} · ${b.model?.age || '—'}<br/><em style="color:var(--grey)">${b.model?.framing || ''}</em></div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Background</div>
+            <div class="spec-value">${b.background || '—'}</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Lighting</div>
+            <div class="spec-value">${b.lighting || '—'}</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Socks</div>
+            <div class="spec-value">${b.socks || '—'}</div>
+          </div>
+        </div>
+        ${b.design_highlight ? `<div style="font-size:12px;color:var(--accent);margin-top:4px">✦ Highlight: ${b.design_highlight}</div>` : ''}
+        <div class="ai-prompt-box">
+          <div class="ai-prompt-label">
+            AI Prompt
+            <button class="copy-btn" onclick="copyPrompt('${promptId}')">Copy</button>
+          </div>
+          <div class="ai-prompt-text" id="${promptId}">${b.ai_prompt}</div>
+        </div>
+      </div>`;
+    return card;
+  }
+
+  // ── Copy prompt ────────────────────────────────────────────────────────────
+  function copyPrompt(id) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector(`[onclick="copyPrompt('${id}')"]`);
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1800);
+    });
+  }
+
+  // ── Download markdown ──────────────────────────────────────────────────────
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    if (!generatedMarkdown) return;
+    const blob = new Blob([generatedMarkdown], { type: 'text/markdown' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `neemans-briefs-${catSel.value.toLowerCase().replace(/\s+/g,'-')}-${genSel.value.toLowerCase().replace(/'/g,'').replace(/\s+/g,'-')}.md`;
+    a.click();
+  });
+
+  // ── Download PDF ───────────────────────────────────────────────────────────
+  document.getElementById('downloadPdfBtn').addEventListener('click', async () => {
+    if (!lastBriefData) return;
+    const btn = document.getElementById('downloadPdfBtn');
+    btn.textContent = '⏳ Building…';
+    btn.disabled = true;
+    try {
+      const resp = await fetch('/generate-pdf', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(lastBriefData),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'PDF generation failed.');
+      }
+      const blob     = await resp.blob();
+      const slug     = lastBriefData.category.toLowerCase().replace(/\s+/g, '-');
+      const genderSlug = lastBriefData.gender.toLowerCase().replace(/'/g, '').replace(/\s+/g, '-');
+      const a        = document.createElement('a');
+      a.href         = URL.createObjectURL(blob);
+      a.download     = `neemans-briefs-${slug}-${genderSlug}.pdf`;
+      a.click();
+    } catch (err) {
+      alert('PDF download failed: ' + err.message);
+    } finally {
+      btn.textContent = '↓ PDF';
+      btn.disabled = false;
+    }
+  });
+
+  // ── Status helper ──────────────────────────────────────────────────────────
+  function setStatus(type, msg) {
+    const el = document.getElementById('status');
+    el.textContent  = msg;
+    el.className    = `status ${type}`;
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>
