@@ -4,8 +4,17 @@ const express     = require('express');
 const multer      = require('multer');
 const Anthropic   = require('@anthropic-ai/sdk');
 const PDFDocument = require('pdfkit');
+const sharp       = require('sharp');
 const fs          = require('fs');
 const path        = require('path');
+
+// Resize image buffer to max 1024px JPEG before sending to Claude API
+async function resizeForAPI(buffer) {
+  return sharp(buffer)
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toBuffer();
+}
 
 const app  = express();
 const PORT = 3000;
@@ -73,9 +82,13 @@ app.post('/generate', upload.array('images', 6), async (req, res) => {
     const client = new Anthropic({ apiKey });
 
     // ── Step 1: Analyse shoe images with Claude Vision ────────────────────
-    const imageBlocks = files.map(f => ({
-      type: 'image',
-      source: { type: 'base64', media_type: f.mimetype, data: f.buffer.toString('base64') },
+    // Resize all uploads to max 1024px JPEG before sending to Claude API
+    const imageBlocks = await Promise.all(files.map(async f => {
+      const resized = await resizeForAPI(f.buffer);
+      return {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: resized.toString('base64') },
+      };
     }));
 
     const visionPrompt = `You are analysing shoe product images for Neemans, an Indian lifestyle footwear brand.
