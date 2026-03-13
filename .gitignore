@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Scraped images (large binary files — not needed for the brief generator)
+scraper/scraped_data/images/
+
+# Generated data files (large, re-creatable)
+scraper/scraped_data/products.json
+scraper/scraped_data/products.csv
+scraper/scraped_data/vision_cache.json
+
+# Keep style_bible.md — the brief generator server needs it
